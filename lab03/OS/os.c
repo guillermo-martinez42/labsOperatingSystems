@@ -4,7 +4,7 @@
 #define UART0_BASE     0x10009000 //0x44E09000
 #define UART_THR       (UART0_BASE + 0x00)  // Transmit Holding Register
 #define UART_LSR       (UART0_BASE + 0x18)  // Line Status Register
-#define UART_LSR_THRE  0x80                  // Transmit Holding Register Empty
+#define UART_LSR_TXFF  0x20                  // Transmit Holding Register Empty
 #define UART_LSR_RXFE  0x10                  // Receive FIFO Empty
 
 
@@ -13,6 +13,24 @@
 #define TIMER_VALUE    (TIMER0_BASE + 0x04)
 #define TIMER_CONTROL  (TIMER0_BASE + 0x08)
 #define TIMER_INTCLR   (TIMER0_BASE + 0x0C)
+
+// Generic Interrupt Controller (GIC)
+#define GIC_DIST_BASE  0x1E001000
+#define GIC_CPU_BASE   0x1E000000
+
+// GIC Distributor Registers
+#define GIC_DIST_CTRL    (*(volatile unsigned int*)(GIC_DIST_BASE + 0x000))
+#define GIC_DIST_ENABLE1 (*(volatile unsigned int*)(GIC_DIST_BASE + 0x104)) // IRQ 32-63
+
+// GIC CPU Interface Registers
+#define GIC_CPU_CTRL     (*(volatile unsigned int*)(GIC_CPU_BASE + 0x000))
+#define GIC_CPU_PRIMASK  (*(volatile unsigned int*)(GIC_CPU_BASE + 0x004))
+#define GIC_CPU_INTACK   (*(volatile unsigned int*)(GIC_CPU_BASE + 0x00C))
+#define GIC_CPU_EOI      (*(volatile unsigned int*)(GIC_CPU_BASE + 0x010))
+
+// Timer 0 is connected to IRQ 44 on RealView PB-A8
+#define TIMER_IRQ_OFFSET (44 - 32) // Bit offset in ENABLE1 register
+
 
 #define VIC_BASE       0x10040000
 #define VIC_INTENABLE  (VIC_BASE + 0x10)
@@ -42,7 +60,7 @@
 // Function to send a single character via UART
 void uart_putc(char c) {
     // Wait until Transmit Holding Register is empty
-    while ((GET32(UART_LSR) & UART_LSR_THRE) == 0);
+    while ((GET32(UART_LSR) & UART_LSR_TXFF) != 0);
     PUT32(UART_THR, c);
 }
 
@@ -116,7 +134,20 @@ void timer_init(void) {
 
     // Timer Control: Enable (bit 7), Periodic (bit 6), Interrupt Enable (bit 5), 32-bit (bit 1)
     PUT32(TIMER_CONTROL, 0xE2);
-	PUT32(VIC_INTENABLE, (1 << 4));
+    // 2. Configure GIC (Interrupt Controller)
+    // Enable the GIC Distributor
+    GIC_DIST_CTRL = 1;
+
+    // Unmask Timer Interrupt (IRQ 44)
+    // IRQ 44 is in the second bank (ENABLE1), so we set bit (44-32) = 12
+    GIC_DIST_ENABLE1 |= (1 << 4);
+
+    // 3. Configure CPU Interface
+    // Set Priority Mask to 0xFF (allow all priorities)
+    GIC_CPU_PRIMASK = 0xFF;
+
+    // Enable CPU Interface
+    GIC_CPU_CTRL = 1;
 
   /* // 1. Enable the timer clock (CM_PER_TIMER2_CLKCTRL = 0x2)
     PUT32(CM_PER_TIMER2_CLKCTRL, 0x2);
@@ -153,8 +184,19 @@ void timer_init(void) {
 // 2. Acknowledge the interrupt to the controller (INTC_CONTROL = 0x1)
 // 3. Print "Tick\n" via UART    PUT32(TISR, 0x2);     PUT32(INTC_CONTROL, 0x1);
 void timer_irq_handler(void) {
-	PUT32(TIMER_INTCLR, 0x1);
-    os_write("Tick\n");
+    // 1. Clear the Timer Interrupt
+    PUT32(TIMER_INTCLR, 1);
+
+    // 2. Acknowledge the Interrupt at the GIC
+    // This tells the GIC we are handling it and gives us the ID
+    unsigned int ack_id = GIC_CPU_INTACK;
+
+    // 3. Print Tick
+    os_write("Tick!!!!!!!!!!!\n");
+
+    // 4. Signal End of Interrupt (EOI) to GIC
+    // This tells the GIC we are done, so it can send the next one
+    GIC_CPU_EOI = ack_id;
 }
 
 void enable_irq(void) {
@@ -197,7 +239,7 @@ int main(void) {
         uart_putnum(random_num);
         
         // Small delay to prevent overwhelming UART
-        for (volatile int i = 0; i < 1000000; i++);
+        for (volatile int i = 0; i < 100000000; i++);
     }
     
     return 0;
