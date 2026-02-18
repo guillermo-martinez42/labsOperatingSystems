@@ -7,7 +7,6 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <sys/wait.h>
-#include <sys/types.h>
 
 int main() {
 
@@ -20,7 +19,7 @@ int main() {
         perror("fork() error");
     else if (pid == 0) {
             //sleep(5);
-            printf("This is  child #%d \n",i);
+            printf("This is the child #%d \n",i);
             printf("Child Process: PID= %d , Parent PID= %d\n",(int) getpid(), (int) getppid());
             sleep(1);
             exit(i+1);
@@ -31,7 +30,7 @@ int main() {
     pid_t terminated_pid;
     while ((terminated_pid = waitpid(-1, &status, 0)) > 0) {
         if (WIFEXITED(status)) {
-            printf("Parent: Child %d finished with exit code %d\n",
+            printf("Parent Process: Child %d finished with exit code %d\n",
                     terminated_pid, WEXITSTATUS(status));
         }
     }

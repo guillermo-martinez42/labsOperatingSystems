@@ -29,11 +29,11 @@ int main() {
                (int) getpid());
 
         if (wait(&status) == -1)
-            perror("wait() error");
+            perror("Parent Process: wait() error");
         else if (WIFEXITED(status))  //WIFEXITED is a Portable Operating System Interface macro used to  determine if a child process terminated normally
-            printf("The child exited with status of %d\n",
+            printf("Parent Process: The child exited with status of %d\n",
                    WEXITSTATUS(status));
         else
-            puts("The child did not exit successfully");
+            puts("Parent Process: The child did not exit successfully");
     }
 }

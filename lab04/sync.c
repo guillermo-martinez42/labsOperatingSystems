@@ -8,7 +8,6 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <sys/wait.h>
-#include <sys/types.h>
 
 int main() {
 
@@ -30,7 +29,7 @@ int main() {
                (int) getpid());
         pid_t child_pid = waitpid(pid, &status, 0);
         if (WIFEXITED(status)) {
-            printf("Child %d exited with status: %d\n", child_pid, WEXITSTATUS(status));
+            printf("Parent Process: Child %d exited with status: %d\n", child_pid, WEXITSTATUS(status));
         }
     }
 }
