@@ -12,7 +12,7 @@
  * - Set end_byte = (thread_id == num_threads-1) ? file_size : (thread_id + 1) * chunk_size
  *
  */
-void calculate_file_partitions(const char* filename, int num_threads, long partitions[]) {
+void calculate_file_partitions(const char* filename, int num_threads, long* partitions) {
     
     FILE *file = fopen(filename, "r");
     if (file == NULL) {
@@ -76,7 +76,7 @@ void* process_log_chunk(void* arg) {
         char url[MAX_URL_LENGTH];
         int status;
 
-        if (sscanf(line, "%15s - - [%*[^]]] \"%*s %255[^ ] %*[^\"]\" %d", ip, url, &status) != 3)
+        if (sscanf(line, "%15s - - [%*[^]]] \"%*s %255[^\"]\" %d", ip, url, &status) != 3)
             continue;
         
         int found = 0;
@@ -182,17 +182,49 @@ void merge_results(AggregatedResults* master, ThreadData* thread_results, int nu
  */
 void report_results(AggregatedResults* results) {
     
+    printf("Total Unique IPs: %d\n", results->ip_count);
+
+    char most_visited_url[MAX_URL_LENGTH];
+    int curr_url_count = 0;
+    for (size_t i = 0; i < results->url_count; i++)
+    {
+        if (curr_url_count < results->urls[i].count)
+        {
+            strcpy(most_visited_url, results->urls[i].url);
+            curr_url_count = results->urls[i].count;
+        }
+    }
+    
+    printf("Most Visited URL: %s (%d times)\n", most_visited_url, curr_url_count);
+
+    int total_errors = results->errors.error_4xx + results->errors.error_5xx;
+    printf("HTTP Errors: %d\n", total_errors);
+    
 }
 
 /*
  * Helper: Free thread data
  */
-void free_thread_data(ThreadData* data, int num_threads) {
+void free_thread_data(ThreadData* thread_data, int num_threads) {
 
-    free(data->ip_results);   
-    free(data->url_results);  
-    free(data->filename);
-    free(data);  
+    for (size_t i = 0; i < num_threads; i++)
+    {
+        free(thread_data[i].ip_results);   
+        free(thread_data[i].url_results);  
+        free(thread_data[i].filename);
+    }
+
+    free(thread_data);  
+
+}
+
+/*
+ * Helper: Free aggregated results
+ */
+void free_aggregated_results(AggregatedResults master) {
+
+    free(master.ips);
+    free(master.urls);
 
 }
 
@@ -221,5 +253,60 @@ double get_elapsed_time(struct timeval start, struct timeval end) {
  *   - Free memory
  */
 void run_benchmark(const char* filename, int num_threads) {
- 
+    
+    long partitions[num_threads];
+    calculate_file_partitions(filename, num_threads, partitions);
+
+    ThreadData* thread_data = malloc(num_threads * sizeof(ThreadData));
+    for (size_t i = 0; i < num_threads; i++)
+    {
+        thread_data[i].start_byte = (i == 0) ? 0 : partitions[i-1];
+        thread_data[i].end_byte = partitions[i];
+        thread_data[i].filename = strdup(filename);
+
+        thread_data[i].ip_results = malloc(MAX_RESULTS * sizeof(IPCount));
+        thread_data[i].ip_count = 0;
+
+        thread_data[i].url_results = malloc(MAX_RESULTS * sizeof(URLCount));
+        thread_data[i].url_count = 0;
+        
+        thread_data[i].error_count.error_4xx = 0;
+        thread_data[i].error_count.error_5xx = 0;
+    }
+
+    struct timeval start;
+    gettimeofday(&start, 0);
+
+    pthread_t thread[num_threads];
+
+    for (size_t i = 0; i < num_threads; i++)
+    {
+        pthread_create(&thread[i], NULL, process_log_chunk, &thread_data[i]);
+    }
+
+    for (size_t i = 0; i < num_threads; i++)
+    {
+        pthread_join(thread[i], NULL);
+    }
+    
+    struct timeval end;
+    gettimeofday(&end, 0);
+
+    AggregatedResults results;
+    results.ips = malloc(MAX_RESULTS * sizeof(IPCount));
+    results.ip_count = 0;
+    results.urls = malloc(MAX_RESULTS * sizeof(URLCount));
+    results.url_count = 0;
+    results.errors.error_4xx = 0;
+    results.errors.error_5xx = 0;
+    merge_results(&results, thread_data, num_threads);
+
+    report_results(&results);
+
+    double elapsed_time = get_elapsed_time(start, end);
+    printf("Elapsed time: %f seconds\n", elapsed_time);
+
+    free_thread_data(thread_data, num_threads);
+    free_aggregated_results(results);
+    
 }

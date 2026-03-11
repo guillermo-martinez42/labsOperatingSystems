@@ -11,6 +11,7 @@
 #define MAX_IP_LENGTH 64
 #define MAX_URL_LENGTH 512
 #define MAX_THREADS 16
+#define MAX_RESULTS 4096
 
 typedef struct {
     char ip[MAX_IP_LENGTH];
@@ -40,10 +41,8 @@ typedef struct {
 
 typedef struct {
     IPCount* ips;
-    int ip_capacity;
     int ip_count;
     URLCount* urls;
-    int url_capacity;
     int url_count;
     ErrorCount errors;
 } AggregatedResults;
@@ -57,6 +56,8 @@ void merge_results(AggregatedResults* master, ThreadData* thread_results, int nu
 void report_results(AggregatedResults* results);
 
 void free_thread_data(ThreadData* data, int num_threads);
+
+void free_aggregated_results(AggregatedResults master);
 
 void run_benchmark(const char* filename, int num_threads);
 
