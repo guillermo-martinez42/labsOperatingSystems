@@ -47,9 +47,9 @@ We achieved this by using a data structure called ThreadData, which contains the
 
 ### Synchronization (Merge)
 
-A synchronization method was not really needed with our implementation, as each partition was processed separately and so now, what it is needed is just to merge all this processed ThreadData to be merged together into the result. This merging gets done after all threads have finished, this way the synchroization is avoided.
+A synchronization method was not really needed with our implementation, as each partition was processed separately and so now, what it is needed is just to merge together all this processed ThreadData into the result. This merging gets done after all threads have finished, this way the synchroization is avoided.
 
-For this, we use a data structure named AggregatedResults. Basically, it contains the IP and URL counters, as well as the IPs, URLs and errors data. So it is a lite version of ThreadData, but without the filename and start and end byte of of the partition.
+For this, we use a data structure named AggregatedResults. Basically, it contains the IP and URL counters, as well as the IPs, URLs and errors data. So it is a lite version of ThreadData, but without the filename and start and end byte of the partition.
 
 ### Aggregation and Reporting
 
@@ -63,7 +63,7 @@ To use each thread, a thread has to be created with pthread_create(). This gets 
 
 Only after having created them, then each thread gets joined with pthread_join(). What this does is it makes the main thread to wait for each thread to be completed, so it can then continue processing the program.
 
-Otherwise unintended behaviour can occur, like the early termination of the main thread, which would have the work by the threads incomplete.
+Otherwise unintended behaviour can occur, like the early termination of the main thread, which would have the incomplete work of the threads.
 
 Further read: https://www.geeksforgeeks.org/c/thread-functions-in-c-c/
 
