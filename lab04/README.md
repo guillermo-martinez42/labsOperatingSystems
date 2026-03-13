@@ -1,4 +1,4 @@
-w# Lab04 - Process Creation and Management
+# Lab04 - Process Creation and Management
 
 #### By @GabGP and @guillermo-martinez42
 
