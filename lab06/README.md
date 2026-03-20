@@ -12,9 +12,9 @@ Functions:
     - Note: A sleep was added between events to achieve a GUI representation, otherwise, events that ocurr in less than a second are not noticeable at all.
     Unfortunately, this changes how the behavior would look like without the sleeps.
 
-![Alt text](./Screenshots/example_console.png "Expected Output")
+![Alt text](https://github.com/guillermo-martinez42/labsOperatingSystems/blob/main/lab06/Screenshots/example_console.png "Expected Output")
 
-![Alt text](./Screenshots/example_gui.png "Expected Output")
+![Alt text](https://github.com/guillermo-martinez42/labsOperatingSystems/blob/main/lab06/Screenshots/example_gui.png "Expected Output")
 
 ## 0. How to Run?
 
@@ -31,7 +31,7 @@ Note: This program is meant to be ran on Linux.
 
 ### Simulate Car Threads
 
-Each car would represent a thread, which has the behavior of:
+Each car would represent a thread, which has a behavior and on each step it logs its status. The behavior is:
 
 Arrival:
 
@@ -72,6 +72,10 @@ Further read:
 ### Thread-Safe Logging
 
 Each time a log is recorded, this is done employing a mutex lock (pthread_mutex_lock/unlock). This way the logs can be protected as they are shared with the threads.
+
+### Statistics Tracking
+
+Each time the statistics are updated, this is done employing a mutex lock (pthread_mutex_lock/unlock). This way the statistics can be protected as they are shared with the threads.
 
 ### GUI
 
