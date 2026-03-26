@@ -104,20 +104,22 @@ void *student_thread(void *arg)
     StudentArgs *student = (StudentArgs *)arg;
     int id = student->id;
     unsigned int seed = (unsigned int)time(NULL) ^ ((unsigned int)id * 2654435761u);
-
-    int arrival_delay = rand_r(&seed) % 6;      /* 0..5 seconds */
-    int direction = rand_r(&seed) % 2;          /* 0=right, 1=left */
-    int crossing_time = (rand_r(&seed) % 3) + 1; /* 1..3 seconds */
-
-    sleep((unsigned int)arrival_delay);
+    free(student);
 
     tls_student_id = id;
-    accessBridge(direction);
-    sleep((unsigned int)crossing_time);
-    exitBridge();
+    while (1)
+    {
+        int arrival_delay = rand_r(&seed) % 6;        /* 0..5 seconds */
+        int direction = rand_r(&seed) % 2;            /* 0=right, 1=left */
+        int crossing_time = (rand_r(&seed) % 3) + 1;  /* 1..3 seconds */
 
-    free(student);
-    return NULL;
+        sleep((unsigned int)arrival_delay);
+        accessBridge(direction);
+        sleep((unsigned int)crossing_time);
+        exitBridge();
+    }
+
+    return NULL; /* Unreachable, kept for clarity. */
 }
 
 int main(void)
