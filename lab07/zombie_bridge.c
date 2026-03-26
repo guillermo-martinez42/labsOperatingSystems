@@ -4,7 +4,7 @@
 #include <time.h>
 #include <unistd.h>
 
-#define NUM_STUDENTS 10
+#define NUM_STUDENTS 20
 #define BRIDGE_CAPACITY 4
 #define DIRECTION_RIGHT 0
 #define DIRECTION_LEFT 1
@@ -14,7 +14,7 @@ typedef struct
     pthread_mutex_t mutex;
     pthread_cond_t condition;
     int students_on_bridge;
-    int crossing_direction; /* -1 means bridge is empty */
+    int crossing_direction; /* -1  is empty */
     int waiting[2];
 } Bridge;
 
