@@ -4,7 +4,7 @@
 #include <time.h>
 #include <unistd.h>
 
-#define NUM_STUDENTS 20
+#define NUM_STUDENTS 10
 #define BRIDGE_CAPACITY 4
 #define DIRECTION_RIGHT 0
 #define DIRECTION_LEFT 1
@@ -16,6 +16,8 @@ typedef struct
     int students_on_bridge;
     int crossing_direction; /* -1  is empty */
     int waiting[2];
+    double total_wait_time;
+    long total_crossings;
 } Bridge;
 
 typedef struct
@@ -28,7 +30,10 @@ Bridge bridge = {
     .condition = PTHREAD_COND_INITIALIZER,
     .students_on_bridge = 0,
     .crossing_direction = -1,
-    .waiting = {0, 0}};
+    .waiting = {0, 0},
+    .total_wait_time = 0,
+    .total_crossings = 0};
+
 
 static __thread int tls_student_id = -1;
 
@@ -37,17 +42,24 @@ const char *direction_name(int direction)
     return direction == DIRECTION_RIGHT ? "Right" : "Left";
 }
 
+double get_avg_wait_time()
+{
+    return bridge.total_wait_time / bridge.total_crossings;
+}
+
 void log_arrival(int student_id, int direction)
 {
     printf("Inge %02d arrives wanting to go %s\n", student_id, direction_name(direction));
 }
 
-void log_enter(int student_id, int direction)
+void log_enter(int student_id, int direction, double wait_time)
 {
-    printf("Inge %02d crosses to the %s (on bridge: %d)\n",
+    printf("Inge %02d crosses to the %s (on bridge: %d) [Wait: %.2fs | Avg: %.2fs]\n",
            student_id,
            direction_name(direction),
-           bridge.students_on_bridge);
+           bridge.students_on_bridge,
+           wait_time,
+           get_avg_wait_time());
 }
 
 void log_exit(int student_id)
@@ -57,6 +69,9 @@ void log_exit(int student_id)
 
 void accessBridge(int direction)
 {
+    struct timespec arrival;
+    clock_gettime(CLOCK_MONOTONIC, &arrival);
+
     pthread_mutex_lock(&bridge.mutex);
 
     bridge.waiting[direction]++;
@@ -68,6 +83,12 @@ void accessBridge(int direction)
         pthread_cond_wait(&bridge.condition, &bridge.mutex);
     }
 
+    struct timespec enter;
+    clock_gettime(CLOCK_MONOTONIC, &enter);
+    double wait_time = (enter.tv_sec - arrival.tv_sec) + (enter.tv_nsec - arrival.tv_nsec) / 1e9;
+    bridge.total_wait_time += wait_time;
+    bridge.total_crossings++;
+
     bridge.waiting[direction]--;
     if (bridge.students_on_bridge == 0)
     {
@@ -75,7 +96,7 @@ void accessBridge(int direction)
     }
 
     bridge.students_on_bridge++;
-    log_enter(tls_student_id, direction);
+    log_enter(tls_student_id, direction, wait_time);
 
     pthread_mutex_unlock(&bridge.mutex);
 }
@@ -107,17 +128,14 @@ void *student_thread(void *arg)
     free(student);
 
     tls_student_id = id;
-    while (1)
-    {
-        int arrival_delay = rand_r(&seed) % 6;        /* 0..5 seconds */
-        int direction = rand_r(&seed) % 2;            /* 0=right, 1=left */
-        int crossing_time = (rand_r(&seed) % 3) + 1;  /* 1..3 seconds */
+    int arrival_delay = rand_r(&seed) % 6;       /* 0..5 seconds */
+    int direction = rand_r(&seed) % 2;           /* 0=right, 1=left */
+    int crossing_time = (rand_r(&seed) % 3) + 1; /* 1..3 seconds */
 
-        sleep((unsigned int)arrival_delay);
-        accessBridge(direction);
-        sleep((unsigned int)crossing_time);
-        exitBridge();
-    }
+    sleep((unsigned int)arrival_delay);
+    accessBridge(direction);
+    sleep((unsigned int)crossing_time);
+    exitBridge();
 
     return NULL; /* Unreachable, kept for clarity. */
 }
