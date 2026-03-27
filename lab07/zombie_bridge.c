@@ -4,10 +4,11 @@
 #include <time.h>
 #include <unistd.h>
 
-#define NUM_STUDENTS 10
+#define NUM_STUDENTS 20
 #define BRIDGE_CAPACITY 4
 #define DIRECTION_RIGHT 0
 #define DIRECTION_LEFT 1
+#define PRIORITY_WAIT_THRESHOLD 5.0
 
 typedef struct
 {
@@ -18,6 +19,8 @@ typedef struct
     int waiting[2];
     double total_wait_time;
     long total_crossings;
+    int starving_direction;
+    int priority_waiters[2];
 } Bridge;
 
 typedef struct
@@ -32,8 +35,9 @@ Bridge bridge = {
     .crossing_direction = -1,
     .waiting = {0, 0},
     .total_wait_time = 0,
-    .total_crossings = 0};
-
+    .total_crossings = 0,
+    .priority_waiters = {0, 0}
+};
 
 static __thread int tls_student_id = -1;
 
@@ -45,6 +49,11 @@ const char *direction_name(int direction)
 double get_avg_wait_time()
 {
     return bridge.total_wait_time / bridge.total_crossings;
+}
+
+double get_current_wait_time(struct timespec now, struct timespec start)
+{
+    return (now.tv_sec - start.tv_sec) + (now.tv_nsec - start.tv_nsec) / 1e9;
 }
 
 void log_arrival(int student_id, int direction)
@@ -77,26 +86,77 @@ void accessBridge(int direction)
     bridge.waiting[direction]++;
     log_arrival(tls_student_id, direction);
 
-    while (bridge.students_on_bridge == BRIDGE_CAPACITY ||
-           (bridge.students_on_bridge > 0 && bridge.crossing_direction != direction))
+    int has_priority = 0;
+    int can_cross = 1;
+
+    while (1)
     {
-        pthread_cond_wait(&bridge.condition, &bridge.mutex);
+        if (!has_priority)
+        {
+            struct timespec now;
+            clock_gettime(CLOCK_MONOTONIC, &now);
+            if (get_current_wait_time(now, arrival) >= PRIORITY_WAIT_THRESHOLD)
+            {
+                has_priority = 1;
+                bridge.priority_waiters[direction]++;
+            }
+        }
+
+        can_cross = 1;
+
+        if (bridge.students_on_bridge == BRIDGE_CAPACITY)
+        {
+            can_cross = 0; // Bridge is full
+        }
+        else if (bridge.students_on_bridge > 0 && bridge.crossing_direction != direction)
+        {
+            can_cross = 0; // Bridge is currently moving the opposite way
+        }
+        else if (!has_priority && bridge.priority_waiters[direction] > 0)
+        {
+            can_cross = 0; // Yield those with priority
+        }
+        else if (has_priority && bridge.crossing_direction == direction)
+        {
+            can_cross = 1; // Has priority
+        }
+        else if (has_priority && bridge.crossing_direction != direction && bridge.students_on_bridge == 0)
+        {
+            can_cross = 1; // Starvation prevention
+        }
+
+        if (!can_cross)
+        {
+            pthread_cond_wait(&bridge.condition, &bridge.mutex);
+        }
+        else
+        {
+            break; 
+        }
     }
 
     struct timespec enter;
     clock_gettime(CLOCK_MONOTONIC, &enter);
-    double wait_time = (enter.tv_sec - arrival.tv_sec) + (enter.tv_nsec - arrival.tv_nsec) / 1e9;
-    bridge.total_wait_time += wait_time;
+    
+    double actual_wait = get_current_wait_time(enter, arrival);
+    bridge.total_wait_time += actual_wait;
     bridge.total_crossings++;
 
-    bridge.waiting[direction]--;
     if (bridge.students_on_bridge == 0)
     {
         bridge.crossing_direction = direction;
     }
 
+    bridge.waiting[direction]--;
     bridge.students_on_bridge++;
-    log_enter(tls_student_id, direction, wait_time);
+
+    if (has_priority)
+    {
+        bridge.priority_waiters[direction]--;
+        printf("[PRIORITY] ");
+    }
+
+    log_enter(tls_student_id, direction, actual_wait);
 
     pthread_mutex_unlock(&bridge.mutex);
 }
