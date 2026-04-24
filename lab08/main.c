@@ -11,7 +11,7 @@ int main(void)
 {
     unsigned int seed = (unsigned int)time(NULL) ^ (2654435761u);
 
-    NUM_THREADS = rand_r(&seed) % 10 + 5; // 5-15 Threads
+    NUM_THREADS = rand_r(&seed) % 11 + 5; // 5-15 Threads
 
     Thread thread[NUM_THREADS];
 
@@ -106,7 +106,7 @@ int main(void)
 
     // SJF
 
-        printf("--- SJF Scheduling--- \n");
+    printf("--- SJF Scheduling--- \n");
 
     thread_reset(thread);
 
@@ -131,7 +131,7 @@ int main(void)
         }
     }
 
-    // Schedule threads as they arrive and re-enqueue if not finished
+    // Schedule threads as SJF
     scheduled = 0;
     while (scheduled < NUM_THREADS)
     {
@@ -148,34 +148,49 @@ int main(void)
 
     print_stats(thread, NUM_THREADS);
 
-    /*
-
     // SRTF
 
+    printf("--- SRTF Scheduling--- \n");
+
+    thread_reset(thread);
+
     pthread_t threads_srtf[NUM_THREADS];
+    Queue *srtf = (Queue *)malloc(sizeof(Queue));
+
+    if (srtf == NULL)
+    {
+        perror("malloc");
+        return EXIT_FAILURE;
+    }
+
+    init_queue(srtf);
 
     for (int i = 0; i < NUM_THREADS; i++)
     {
-        if (pthread_create(&threads_srtf[i], NULL, fifo_schedule, thread[i]) != 0)
+        thread[i].queue = srtf;
+        if (pthread_create(&threads_srtf[i], NULL, srtf_thread, &thread[i]) != 0)
         {
             perror("pthread_create");
-            free(threads_srtf);
             return EXIT_FAILURE;
         }
     }
 
-    for (int i = 0; i < NUM_THREADS; i++)
+    // Schedule threads as SRTF
+    scheduled = 0;
+    while (scheduled < NUM_THREADS)
     {
-        if (pthread_join(threads_srtf[i], NULL) != 0)
+        Thread *curr_thread = get_SRTF(srtf);
+        if (curr_thread != NULL)
         {
-            perror("pthread_join");
-            return EXIT_FAILURE;
+            srtf_schedule(curr_thread, &scheduled);
+            scheduled++;
         }
     }
 
-    free(threads_srtf);
+    pthread_mutex_destroy(&srtf->lock);
+    free(srtf);
 
-    */
+    print_stats(thread, NUM_THREADS);
 
     return EXIT_SUCCESS;
 }

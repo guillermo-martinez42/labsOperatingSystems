@@ -72,7 +72,7 @@ void insert_SJF(Queue *q, Thread *thread)
     new_node->thread = thread;
 
     // Insert in front
-    if (q->front == NULL || q->front->thread->burst_time > thread->burst_time)
+    if (q->front == NULL || q->front->thread->remaining_time > thread->remaining_time)
     {
         new_node->next = q->front;
         q->front = new_node;
@@ -83,7 +83,7 @@ void insert_SJF(Queue *q, Thread *thread)
     {
         // Insert in order
         Node *curr = q->front;
-        while (curr->next != NULL && curr->next->thread->burst_time <= thread->burst_time)
+        while (curr->next != NULL && curr->next->thread->remaining_time <= thread->remaining_time)
         {
             curr = curr->next;
         }
