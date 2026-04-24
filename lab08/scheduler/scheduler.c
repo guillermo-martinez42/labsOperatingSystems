@@ -1,209 +1,151 @@
 #include "scheduler.h"
+#include "fifo.c"
+#include "rr.c"
+#include "sjf.c"
+#include "srtf.c"
 
-// Track the first process's start time for baseline calculations
-static double base_time_fifo = 0;
-static double base_time_rr = 0;
-static double base_time_sjf = 0;
-static double base_time_srtf = 0;
-
-// FIFO
-
-void *fifo_thread(void *arg)
+void run_fifo(Thread *threads)
 {
-    Thread *thread = (Thread *)arg;
-    sleep((unsigned int)thread->arrival_time);
-    enqueue(thread->queue, thread);
-    log_arrival(thread);
+    printf("--- FIFO Scheduling --- \n");
+    pthread_t p_threads[NUM_THREADS];
+    Queue *q = (Queue *)malloc(sizeof(Queue));
+    if (q == NULL) return;
 
-    return NULL;
-}
+    init_queue(q);
 
-void fifo_schedule(Thread *thread)
-{
-    struct timespec start;
-    clock_gettime(CLOCK_MONOTONIC, &start);
-
-    thread->start_time = start.tv_sec + start.tv_nsec / 1e9;
-
-    if (base_time_fifo == 0)
+    for (int i = 0; i < (int)NUM_THREADS; i++)
     {
-        base_time_fifo = thread->start_time - thread->arrival_time;
-    }
-
-    double waiting_time = thread->start_time - (base_time_fifo + thread->arrival_time);
-    log_start(thread, thread->arrival_time, waiting_time);
-    sleep((unsigned int)thread->burst_time);
-
-    // Updating statistics
-    struct timespec now;
-    clock_gettime(CLOCK_MONOTONIC, &now);
-
-    thread->remaining_time = 0;
-    thread->completion_time = now.tv_sec + now.tv_nsec / 1e9;
-    thread->turnaround_time = thread->completion_time - (base_time_fifo + thread->arrival_time);
-    thread->waiting_time = thread->turnaround_time - thread->burst_time;
-
-    log_completion(thread);
-}
-
-// Round Robin
-
-int quantum = 2;
-
-void *rr_thread(void *arg)
-{
-    Thread *thread = (Thread *)arg;
-    sleep((unsigned int)thread->arrival_time);
-    enqueue(thread->queue, thread);
-    log_arrival(thread);
-
-    return NULL;
-}
-
-void rr_schedule(Thread *thread, int *scheduled)
-{
-    struct timespec start;
-    clock_gettime(CLOCK_MONOTONIC, &start);
-
-    thread->start_time = start.tv_sec + start.tv_nsec / 1e9;
-
-    if (base_time_rr == 0)
-    {
-        base_time_rr = thread->start_time - thread->arrival_time;
-    }
-
-    double waiting_time = thread->start_time - (base_time_rr + thread->arrival_time) - (thread->burst_time - thread->remaining_time);
-    log_start(thread, thread->arrival_time, waiting_time);
-
-    if (thread->remaining_time - quantum <= 0)
-    {
-        sleep((unsigned int)thread->remaining_time);
-        thread->remaining_time = 0;
-
-        // Updating statistics
-        struct timespec now;
-        clock_gettime(CLOCK_MONOTONIC, &now);
-
-        thread->completion_time = now.tv_sec + now.tv_nsec / 1e9;
-        thread->turnaround_time = thread->completion_time - (base_time_rr + thread->arrival_time);
-        thread->waiting_time = thread->turnaround_time - thread->burst_time;
-
-        log_completion(thread);
-    }
-    else
-    {
-        sleep(quantum);
-        thread->remaining_time -= quantum;
-        (*scheduled)--;
-
-        log_preemption(thread);
-        enqueue(thread->queue, thread);
-    }
-}
-
-// SJF
-
-void *sjf_thread(void *arg)
-{
-    Thread *thread = (Thread *)arg;
-    sleep((unsigned int)thread->arrival_time);
-    insert_SJF(thread->queue, thread);
-    log_arrival(thread);
-
-    return NULL;
-}
-
-void sjf_schedule(Thread *thread)
-{
-    struct timespec start;
-    clock_gettime(CLOCK_MONOTONIC, &start);
-
-    thread->start_time = start.tv_sec + start.tv_nsec / 1e9;
-
-    if (base_time_sjf == 0)
-    {
-        base_time_sjf = thread->start_time - thread->arrival_time;
-    }
-
-    double waiting_time = thread->start_time - (base_time_sjf + thread->arrival_time);
-    log_start(thread, thread->arrival_time, waiting_time);
-    sleep((unsigned int)thread->burst_time);
-
-    // Updating statistics
-    struct timespec now;
-    clock_gettime(CLOCK_MONOTONIC, &now);
-
-    thread->remaining_time = 0;
-    thread->completion_time = now.tv_sec + now.tv_nsec / 1e9;
-    thread->turnaround_time = thread->completion_time - (base_time_sjf + thread->arrival_time);
-    thread->waiting_time = thread->turnaround_time - thread->burst_time;
-
-    log_completion(thread);
-}
-
-// SRTF
-
-void *srtf_thread(void *arg)
-{
-    Thread *thread = (Thread *)arg;
-    sleep((unsigned int)thread->arrival_time);
-    insert_SJF(thread->queue, thread);
-    log_arrival(thread);
-
-    return NULL;
-}
-
-void srtf_schedule(Thread *thread, int *scheduled)
-{
-    struct timespec start;
-    clock_gettime(CLOCK_MONOTONIC, &start);
-
-    thread->start_time = start.tv_sec + start.tv_nsec / 1e9;
-
-    if (base_time_srtf == 0)
-    {
-        base_time_srtf = thread->start_time - thread->arrival_time;
-    }
-
-    double waiting_time = thread->start_time - (base_time_srtf + thread->arrival_time) - (thread->burst_time - thread->remaining_time);
-    log_start(thread, thread->arrival_time, waiting_time);
-
-    while (thread->remaining_time > 0)
-    {
-        // Run for a short tick to allow preemption checks
-        double run_time = GET_RUN_TIME(thread->remaining_time);
-        usleep((unsigned int)(run_time * 1e6));
-        thread->remaining_time -= run_time;
-
-        if (thread->remaining_time <= 0)
+        threads[i].queue = q;
+        if (pthread_create(&p_threads[i], NULL, fifo_thread, &threads[i]) != 0)
         {
-            thread->remaining_time = 0;
-
-            struct timespec now;
-            clock_gettime(CLOCK_MONOTONIC, &now);
-
-            thread->completion_time = now.tv_sec + now.tv_nsec / 1e9;
-            thread->turnaround_time = thread->completion_time - (base_time_srtf + thread->arrival_time);
-            thread->waiting_time = thread->turnaround_time - thread->burst_time;
-
-            log_completion(thread);
+            perror("pthread_create");
             return;
         }
+    }
 
-        // Check the queue for a thread with shorter remaining time
-        Queue *q = (Queue *)thread->queue;
-        pthread_mutex_lock(&q->lock);
-
-        if (q->front != NULL && q->front->thread->remaining_time < thread->remaining_time)
+    int scheduled = 0;
+    while (scheduled < (int)NUM_THREADS)
+    {
+        Thread *curr_thread = dequeue(q);
+        if (curr_thread != NULL)
         {
-            pthread_mutex_unlock(&q->lock);
+            fifo_schedule(curr_thread);
+            scheduled++;
+        }
+    }
 
-            (*scheduled)--;
-            log_preemption(thread);
-            insert_SJF(q, thread);
+    pthread_mutex_destroy(&q->lock);
+    free(q);
+    print_stats(threads, NUM_THREADS);
+}
+
+void run_rr(Thread *threads)
+{
+    printf("--- Round Robin Scheduling (Quantum 2) --- \n");
+    thread_reset(threads);
+
+    pthread_t p_threads[NUM_THREADS];
+    Queue *q = (Queue *)malloc(sizeof(Queue));
+    if (q == NULL) return;
+
+    init_queue(q);
+
+    for (int i = 0; i < (int)NUM_THREADS; i++)
+    {
+        threads[i].queue = q;
+        if (pthread_create(&p_threads[i], NULL, rr_thread, &threads[i]) != 0)
+        {
+            perror("pthread_create");
             return;
         }
-
-        pthread_mutex_unlock(&q->lock);
     }
+
+    int scheduled = 0;
+    while (scheduled < (int)NUM_THREADS)
+    {
+        Thread *curr_thread = dequeue(q);
+        if (curr_thread != NULL)
+        {
+            rr_schedule(curr_thread, &scheduled);
+            scheduled++;
+        }
+    }
+
+    pthread_mutex_destroy(&q->lock);
+    free(q);
+    print_stats(threads, NUM_THREADS);
+}
+
+void run_sjf(Thread *threads)
+{
+    printf("--- SJF Scheduling--- \n");
+    thread_reset(threads);
+
+    pthread_t p_threads[NUM_THREADS];
+    Queue *q = (Queue *)malloc(sizeof(Queue));
+    if (q == NULL) return;
+
+    init_queue(q);
+
+    for (int i = 0; i < (int)NUM_THREADS; i++)
+    {
+        threads[i].queue = q;
+        if (pthread_create(&p_threads[i], NULL, sjf_thread, &threads[i]) != 0)
+        {
+            perror("pthread_create");
+            return;
+        }
+    }
+
+    int scheduled = 0;
+    while (scheduled < (int)NUM_THREADS)
+    {
+        Thread *curr_thread = dequeue(q);
+        if (curr_thread != NULL)
+        {
+            sjf_schedule(curr_thread);
+            scheduled++;
+        }
+    }
+
+    pthread_mutex_destroy(&q->lock);
+    free(q);
+    print_stats(threads, NUM_THREADS);
+}
+
+void run_srtf(Thread *threads)
+{
+    printf("--- SRTF Scheduling--- \n");
+    thread_reset(threads);
+
+    pthread_t p_threads[NUM_THREADS];
+    Queue *q = (Queue *)malloc(sizeof(Queue));
+    if (q == NULL) return;
+
+    init_queue(q);
+
+    for (int i = 0; i < (int)NUM_THREADS; i++)
+    {
+        threads[i].queue = q;
+        if (pthread_create(&p_threads[i], NULL, srtf_thread, &threads[i]) != 0)
+        {
+            perror("pthread_create");
+            return;
+        }
+    }
+
+    int scheduled = 0;
+    while (scheduled < (int)NUM_THREADS)
+    {
+        Thread *curr_thread = get_SRTF(q);
+        if (curr_thread != NULL)
+        {
+            srtf_schedule(curr_thread, &scheduled);
+            scheduled++;
+        }
+    }
+
+    pthread_mutex_destroy(&q->lock);
+    free(q);
+    print_stats(threads, NUM_THREADS);
 }
