@@ -64,10 +64,10 @@ void log_start(Thread *thread, double arrival_time, double waiting_time)
     }
 }
 
-void log_preemption(Thread *thread, int remaining)
+void log_preemption(Thread *thread)
 {
     print_timestamp();
-    printf("Process %d (%d remaining): Preempted\n", thread->id, remaining);
+    printf("Process %d (Burst %d remaining): Preempted\n", thread->id, (int)thread->remaining_time);
 }
 
 void log_completion(Thread *thread)
@@ -102,5 +102,5 @@ void print_stats(Thread *thread, unsigned int count)
     }
     printf("] \n");
     
-    printf("Avg Turnaround Time: %.2f seconds \n", total_turnaround / count);
+    printf("Avg Turnaround Time: %.2f seconds \n\n", total_turnaround / count);
 }

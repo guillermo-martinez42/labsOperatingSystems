@@ -1,4 +1,3 @@
-#include <stdio.h>
 #include "../process/process.h"
 #include "queue.h"
 
@@ -6,13 +5,18 @@ void init_queue(Queue *q)
 {
     q->front = NULL;
     q->back = NULL;
+    pthread_mutex_init(&q->lock, NULL);
 }
 
 void enqueue(Queue *q, Thread *curr_thread)
 {
+    pthread_mutex_lock(&q->lock);
     Node *new_node = (Node *)malloc(sizeof(Node));
     if (new_node == NULL)
+    {
+        pthread_mutex_unlock(&q->lock);
         return; // Allocation failed
+    }
 
     new_node->thread = curr_thread;
     new_node->next = NULL;
@@ -20,17 +24,23 @@ void enqueue(Queue *q, Thread *curr_thread)
     if (q->back == NULL)
     {
         q->front = q->back = new_node;
+        pthread_mutex_unlock(&q->lock);
         return;
     }
 
     q->back->next = new_node;
     q->back = new_node;
+    pthread_mutex_unlock(&q->lock);
 }
 
 Thread *dequeue(Queue *q)
 {
+    pthread_mutex_lock(&q->lock);
     if (q->front == NULL)
+    {
+        pthread_mutex_unlock(&q->lock);
         return NULL;
+    }
 
     Node *curr = q->front;
     Thread *thread = curr->thread;
@@ -44,21 +54,8 @@ Thread *dequeue(Queue *q)
     }
 
     free(curr);
+    pthread_mutex_unlock(&q->lock);
     return thread;
-}
-
-// For Round Robin
-void requeue(Queue *q)
-{
-    if (q->front == NULL)
-        return;
-
-    Node *curr = q->front;
-    q->front = q->front->next;
-
-    enqueue(q, curr->thread);
-
-    free(curr); // test
 }
 
 // For SJF & SRTF

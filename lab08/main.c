@@ -10,8 +10,8 @@
 int main(void)
 {
     unsigned int seed = (unsigned int)time(NULL) ^ (2654435761u);
-    
-    NUM_THREADS = rand_r(&seed) % 10 + 5;     // 5-15 Threads
+
+    NUM_THREADS = rand_r(&seed) % 10 + 5; // 5-15 Threads
 
     Thread thread[NUM_THREADS];
 
@@ -55,36 +55,56 @@ int main(void)
         }
     }
 
+    pthread_mutex_destroy(&fifo->lock);
     free(fifo);
 
     print_stats(thread, NUM_THREADS);
 
-    /*
-
     // Round Robin
 
+    printf("--- Round Robin Scheduling (Quantum 2) --- \n");
+
+    thread_reset(thread);
+
     pthread_t threads_rr[NUM_THREADS];
+    Queue *rr = (Queue *)malloc(sizeof(Queue));
+
+    if (rr == NULL)
+    {
+        perror("malloc");
+        return EXIT_FAILURE;
+    }
+
+    init_queue(rr);
 
     for (int i = 0; i < NUM_THREADS; i++)
     {
-        if (pthread_create(&threads_rr[i], NULL, fifo_schedule, thread[i]) != 0)
+        thread[i].queue = rr;
+        if (pthread_create(&threads_rr[i], NULL, rr_thread, &thread[i]) != 0)
         {
             perror("pthread_create");
-            free(threads_rr);
             return EXIT_FAILURE;
         }
     }
 
-    for (int i = 0; i < NUM_THREADS; i++)
+    // Schedule threads as they arrive and re-enqueue if not finished
+    scheduled = 0;
+    while (scheduled < NUM_THREADS)
     {
-        if (pthread_join(threads_rr[i], NULL) != 0)
+        Thread *curr_thread = dequeue(rr);
+        if (curr_thread != NULL)
         {
-            perror("pthread_join");
-            return EXIT_FAILURE;
+            rr_schedule(curr_thread, &scheduled);
+            scheduled++;
         }
     }
 
-    free(threads_rr);
+    pthread_mutex_destroy(&rr->lock);
+    free(rr);
+
+    print_stats(thread, NUM_THREADS);
+
+    /*
 
     // SJF
 
