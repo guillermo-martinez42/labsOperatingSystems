@@ -104,32 +104,51 @@ int main(void)
 
     print_stats(thread, NUM_THREADS);
 
-    /*
-
     // SJF
 
+        printf("--- SJF Scheduling--- \n");
+
+    thread_reset(thread);
+
     pthread_t threads_sjf[NUM_THREADS];
+    Queue *sjf = (Queue *)malloc(sizeof(Queue));
+
+    if (sjf == NULL)
+    {
+        perror("malloc");
+        return EXIT_FAILURE;
+    }
+
+    init_queue(sjf);
 
     for (int i = 0; i < NUM_THREADS; i++)
     {
-        if (pthread_create(&threads_sjf[i], NULL, fifo_schedule, thread[i]) != 0)
+        thread[i].queue = sjf;
+        if (pthread_create(&threads_sjf[i], NULL, sjf_thread, &thread[i]) != 0)
         {
             perror("pthread_create");
-            free(threads_sjf);
             return EXIT_FAILURE;
         }
     }
 
-    for (int i = 0; i < NUM_THREADS; i++)
+    // Schedule threads as they arrive and re-enqueue if not finished
+    scheduled = 0;
+    while (scheduled < NUM_THREADS)
     {
-        if (pthread_join(threads_sjf[i], NULL) != 0)
+        Thread *curr_thread = dequeue(sjf);
+        if (curr_thread != NULL)
         {
-            perror("pthread_join");
-            return EXIT_FAILURE;
+            sjf_schedule(curr_thread);
+            scheduled++;
         }
     }
 
-    free(threads_sjf);
+    pthread_mutex_destroy(&sjf->lock);
+    free(sjf);
+
+    print_stats(thread, NUM_THREADS);
+
+    /*
 
     // SRTF
 
