@@ -11,10 +11,11 @@ Welcome to the **Operating Systems Labs** repository! This collection of assignm
 | **Lab 001** | Hello World (Qemu) | Bare-metal programming, UART, Cross-compilation | ARM / QEMU |
 | **Lab 002** | Calculator | Abstraction layers, Custom I/O (`printf`/`scanf`), Hardware Interfacing | ARM / QEMU |
 | **Lab 003** | Interrupts and Exceptions | Timer Peripherals, Interrupt Vector Table (IVT), ISRs | ARM / QEMU |
-| **Lab 004** | Process Management | `fork()`, `exec()`, IPC (Pipes/Shared Memory), Synchronization | Linux / Windows |
-| **Lab 005** | Threads | Pthreads/WinAPI, Multi-threading, Log Parsing | Linux / Windows |
-| **Lab 006** | Semaphores | Counting semaphores, Mutex locks, Shared resources | Linux / Windows |
-| **Lab 007** | Condition Variables | Thread coordination, Complex synchronization logic | Linux / Windows |
+| **Lab 004** | Process Management | `fork()`, `exec()`, IPC (Pipes/Shared Memory), Synchronization | Linux |
+| **Lab 005** | Threads | Pthreads, Multi-threading, Log Parsing | Linux |
+| **Lab 006** | Semaphores | Counting semaphores, Mutex locks, Shared resources | Linux |
+| **Lab 007** | Condition Variables | Thread coordination, Complex synchronization logic | Linux |
+| **Lab 008** | CPU Scheduling | FIFO, SJF, Round Robin, SRTF, Mutex synchronization | Linux |
 
 ---
 
@@ -47,6 +48,10 @@ Introduces **counting semaphores** to manage a limited shared resource. You will
 ### Lab 007: Condition Variables (Zombie Bridge Crossing Challenge)
 
 A complex concurrency challenge requiring **condition variables** and **mutex locks**. You will manage directional traffic across a narrow bridge, ensuring maximum capacity rules and direction synchronization are enforced to avoid the zombie horde.
+
+### Lab 008: CPU Scheduling Algorithms
+
+Simulates various CPU scheduling strategies using multi-threading. This lab covers non-preemptive algorithms (FIFO, SJF) and preemptive ones (Round Robin, SRTF), focusing on performance metrics like Waiting Time and Turnaround Time using thread-safe queues.
 
 ---
 
