@@ -11,12 +11,12 @@ int main(int argc, char* argv[]) {
     printf("Processing file: %s\n\n", filename);
     
     printf("--- Running with 1 thread ---\n");
-    run_benchmark(filename, 1);
+    run_benchmark(filename, 2);
     
 
     
     printf("\n--- Running with 4 threads ---\n");
-    run_benchmark(filename, 4);
+    run_benchmark(filename, 6);
     
     return 0;
 }
